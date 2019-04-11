@@ -1,3 +1,22 @@
+composer require yajra/laravel-datatables-oracle
+
+===========================================================================================================================
+Schema::create('users', function (Blueprint $table) {
+$table->increments('id');
+$table->string('name');
+$table->string('email');
+$table->text('password');
+$table->enum('who_see_location', ['everyone', 'friends'])->default('friends');
+$table->integer('technologies_id')->unsigned();
+$table->foreign('technologies_id')->references('id')->on('technologies')->onDelete('cascade');
+$table->string('status')->default('1');
+$table->string('status')->nullable();
+$table->rememberToken();
+$table->timestamps();
+$table->boolean('is_user_admin')->default(false);
+});
+
+
 ============================================================================
 Route::group(['middleware' => ['auth', 'admin']], function() {
       
@@ -73,7 +92,81 @@ use Yajra\Datatables\Datatables;
     }
 
    
-
+public function store(Request $request)
+    {
+        $r = $request->all();
+        $rules = array(
+            'firstname' => 'required|max:20',
+            'lastname' => 'required|max:20',
+            'email' => 'required|email|unique:users,email',
+            'company_id' => 'required|numeric|exists:company,id',
+            'hobbies' => 'required',
+            'image' => 'nullable|mimes:jpeg,jpg,png,gif',
+        );
+        if(!isset($r["id_for_update"])) {
+               $rules["password"] = "required";
+        }
+        $messages = [
+            'firstname.required' => 'Please enter firstname',
+            'lastname.required' => 'Please enter lastname',
+            'email.required' => 'Please enter email',
+            'email.email' => 'Please enter valid email',
+            'company_id.required' => 'Please select company',
+            'hobbies.required' => 'Please select at least one hobby',
+        ];
+        $validator = Validator::make($r, $rules,$messages);
+        if($validator->fails()) {
+            $arr = array("status"=>400,"msg"=>$validator->errors()->first(),"result"=>array());
+            //return Redirect::back()->withErrors($validator)->withInput();
+        } else {
+            begin();
+            try {
+                if(isset($r["id_for_update"])) {
+                    $user = User::find($r["id_for_update"]);
+                } else {
+                    $user = new User();
+                }
+                if(isset($r["image"]) && !empty($r["image"])) {
+                    $image = $r["image"];
+                    $image_name = time()."_".$image->getClientOriginalName();
+                    copy($image->getRealPath(), base_path('images/'.$image_name));
+                    $r["image"] = $image_name;
+                }
+                $pass = \Hash::make($r["password"]);
+                $r["password"] = $pass;
+                $user->fill($r)->save();
+                $h = [];
+                if(isset($r["hobbies"])) {
+                    $h = $r["hobbies"];
+                }
+                $user->hobbies()->sync($h);
+                commit();
+                
+                /*Send email*/
+                /*\Mail::send('emails.test', ["data"=>$r], function ($message) use ($r) {
+                    $message->from('us@example.com', 'Laravel');
+                    $message->to($r['email'])->subject('test email');
+                });*/
+                /*Send email*/
+                $arr = array("status"=>200,"msg"=>"User created.","result"=>$user->get()->toArray());
+                //return Redirect::to('user');
+            } catch(\Illuminate\Database\QueryException $ex){ 
+                $msg = $ex->getMessage();
+                if(isset($ex->errorInfo[2])) {
+                    $msg = $ex->errorInfo[2];
+                }
+                rollback();
+                $arr = array("status"=>400,"msg"=>$msg,"result"=>array());
+                //return Redirect::back()->withErrors(['error'=>$msg]);
+            }  catch (Exception $ex) {
+                rollback();
+                $arr = array("status"=>400,"msg"=>"error","result"=>array());
+                //return "error";
+            }
+        }
+        return \Response::json($arr);
+        
+    }
     ==============================================================================================================
     public function getall() {
         $input = $this->request->all();
@@ -136,81 +229,54 @@ use Yajra\Datatables\Datatables;
             ]
         });
     });
-
+</script>
     ===========================================================================================================
 
-     public function statusChange(Request $request) {
-
-        $id = $request->id;
-        $type = $request->type;
-        $data = Category::find($id);
-        if ($data) {
-            $data->status = $type;
-            $data->save();
-
-            $arr = array("status" => 200, "message" => "Status updated successfully.", "data" => []);
+     public function destroy($id)
+    {
+        $user = User::find($id);
+        if($user) {
+            $path = $user->image;
+            $user->delete();
+            if(!empty($path)) {
+                if(file_exists(base_path('images/'.$path))) {
+                    unlink(base_path('images/'.$path));
+                }
+            }
+            $arr = array("status"=>200,"msg"=>"User deleted.","data"=>[]);
         } else {
-            $arr = array("status" => 400, "message" => "Category not found.", "data" => []);
+            $arr = array("status"=>400,"msg"=>"No user found.","data"=>[]);
         }
-
         return \Response::json($arr);
     }
 
-     /*status change notification*/
-    $(document).on('click', '.status', function () {
-        var t = $(this);
-        var id = t.attr("id");
-        var type = t.attr("data-type");
-        swal({
-            title: "Are you sure?",
-            text: "You want to  "+type+" this user!",
-            type: "warning",
-            timer: 3000,
-            showCancelButton: true,
-            confirmButtonClass: "btn-danger",
-            confirmButtonText: "Yes, change it!",
-            cancelButtonText: "No, cancel !",
-            closeOnConfirm: true,
-            closeOnCancel: true,
-            showLoaderOnConfirm: true,
-        }, function (isConfirm) {
-            if (isConfirm) {
+     /*delete notification*/
+<a class="delsing cpforall" id="'.$q->id.'" title="Delete"><i class="fa fa-trash" aria-hidden="true"></i></a>
+   <script>
+	   $("body").on('click','.delsing',function () {
+                var t = $(this);
+                var id = t.attr("id");
                 $.ajax({
-                    type: "post",
-                    url: '{{url("user/statuschange")}}',
-                    data: {
-                        id: id,
-                        type: type,
-                    },
+                    'method':'delete',
+                    'url':'{{url("user")}}/'+id,
+//                    'data' : $("#formid").serialize();
                     'headers': {
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
                     },
-                    success: function (data) {
-                        if (data.status == 400) {
-                            swal("Error", data.message, "error");
-                        } else {
-                            $("label").css({'color': '#3f4047'});
-                            swal("", data.message, "success");
+                    'success' : function (data) {
+                        alert(data.msg);
+                        if(data.status == 200) {
+                            //$("#example2").DataTable().ajax.reload();
+                            t.parents("tr").fadeOut(function () {
+                                $(this).remove();
+                            });
                         }
-                        unload();
-                        $("#example2").DataTable().ajax.reload(null, false);
-
-
-
                     },
-                    error: function (xhr, ajaxOptions, thrownError) {
-                        swal("Server Timeout!", "Please try again", "warning");
+                    'error' : function () {
+                        alert("Error");
                     },
-                    // timeout: 3000,
                 });
-            } else
-            {
-
-                swal();
-            }
-        });
-
-    });
+            });
 </script> 
 ==================================================================================================================
 
