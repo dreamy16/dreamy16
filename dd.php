@@ -104,6 +104,7 @@ function userProfileImageUpload($profile_img, $folder = "users") {
 function displayImage($imagename) {
     return url('public/storage') . "/" . $imagename;
 }
+
 public function store(Request $request)
     {
         $r = $request->all();
