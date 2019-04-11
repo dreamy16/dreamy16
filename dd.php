@@ -91,7 +91,19 @@ use Yajra\Datatables\Datatables;
         return $this->store($request);
     }
 
-   
+   //image upload
+function userProfileImageUpload($profile_img, $folder = "users") {
+    $info = pathinfo($profile_img->getClientOriginalName());
+    $ext = $info['extension'];
+    $img_name = time() . "-" . rand(11111, 99999) . "." . $ext;
+    $path = \Storage::disk('public')->putFileAs(
+            $folder, $profile_img, $img_name
+    );
+    return $img_name;
+}
+function displayImage($imagename) {
+    return url('public/storage') . "/" . $imagename;
+}
 public function store(Request $request)
     {
         $r = $request->all();
