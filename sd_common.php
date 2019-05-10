@@ -286,4 +286,112 @@ RewriteRule .* https://www.%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 /*create job*/
 - php artisan make:job NotificationToAllUsers
 php artisan make:job SendReminderEmail
+/**/
+/*slient notification*/
+ public static function iOSSlientNotification($data, $devicetoken, $production) {
+
+        foreach ($data as $key => $value) {
+            if (is_null($value)) {
+                $data[$key] = "";
+            }
+        }
+        //date_default_timezone_set("Europe/London");
+        $deviceToken = $devicetoken;
+        $createddate = date("Y-m-d H:i:s");
+
+        $ctx = stream_context_create();
+        //$production = 0;
+        if ($production == 0) {
+            $notUrl = 'ssl://gateway.sandbox.push.apple.com:2195';
+            stream_context_set_option($ctx, 'ssl', 'local_cert', __DIR__ . '/iOs_Doctor/pushcertDeveloper.pem');
+        } else {
+            $notUrl = 'ssl://gateway.push.apple.com:2195';
+            stream_context_set_option($ctx, 'ssl', 'local_cert', __DIR__ . '/iOs_Doctor/pushcertProdConnect.pem');
+        }
+
+        stream_context_set_option($ctx, 'ssl', 'passphrase', self::$passphrase);
+
+        $fp = stream_socket_client($notUrl, $err, $errstr, 60, STREAM_CLIENT_CONNECT | STREAM_CLIENT_PERSISTENT, $ctx);
+
+        if (!$fp)
+            exit("Failed to connect: $err $errstr" . PHP_EOL);
+
+        $body['aps'] = array(
+            'alert' => array(
+                //  'title'=>'',
+                'Notification_Type' => (isset($data['Notification_Type']) && !is_null($data['Notification_Type'])) ? $data['Notification_Type'] : '',
+                'is_lifetime_wavier' => (isset($data['is_lifetime_wavier']) && !is_null($data['is_lifetime_wavier'])) ? $data['is_lifetime_wavier'] : '',
+            ),
+            'badge' => 1,
+            'sound' => "",
+            'content-available' => 1
+        );
+
+        $payload = json_encode($body);
+        $msg = chr(0) . pack('n', 32) . pack('H*', $deviceToken) . pack('n', strlen($payload)) . $payload;
+        $result = fwrite($fp, $msg, strlen($msg));
+        fclose($fp);      
+
+        if (!$result)
+            return false;
+        else
+            return true;
+    }
+    public static function androidSlientNotification($data, $reg_id, $production) {
+        //date_default_timezone_set("Europe/London");
+
+        $registrationIds = array($reg_id);
+
+        $data['createddate'] = date("Y-m-d H:i:s");
+
+        $fields = array(
+            'registration_ids' => $registrationIds,
+            'data' => array(
+                'title' => 'Test Notification ',
+                'message' => (isset($data['message']) && !is_null($data['message'])) ? $data['message'] : '',
+                'lifetime_wavier' => (isset($data['lifetime_wavier']) && !is_null($data['lifetime_wavier'])) ? $data['lifetime_wavier'] : '',
+                //  'vibrate' => 1,
+                'Notification_Type' => 'status_update',
+                'sound' => 'default',
+                 'type' => "Silent",
+            
+            // 'largeIcon' => 'large_icon',
+            // 'smallIcon' => 'small_icon'
+            )
+        );
+        $headers = array(
+            'Authorization: key=' . self::$API_ACCESS_KEY,
+            'Content-Type: application/json'
+        );
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, 'https://android.googleapis.com/gcm/send');
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($fields));
+        $result = curl_exec($ch);
+        curl_close($ch);
+       
+        if (!$result)
+            return false;
+        else
+            return true;
+    }
+	/*slient notification*/
+	/*multiple selected at edit time*/	
+	$coatch_students = array();
+	if(!empty($data)){
+		$coatch_students = $data->coatch_students->toArray();
+	}                                    
+	
+	if(isset($students) && !empty($students))
+	foreach($students as $key =>$value)
+	
+	 <option value="{{$value->id}}" @if(array_search($value->id, array_column($coatch_students, 'student_id')) !== False) selected="selected" @endif>{{$value->firstname}}</option>
+	
+	endforeach
+	endif
+/*multiple selected at edit time*/
 ?>
