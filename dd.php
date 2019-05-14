@@ -243,6 +243,10 @@ public function store(Request $request)
         });
     });
 </script>
+====================================================
+<script type="text/javascript" src="//cdn.jsdelivr.net/jquery/1.12.4/jquery.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/jquery.form/4.2.2/jquery.form.js"></script> 
+<script type="text/javascript" src="//cdn.jsdelivr.net/jquery.validation/1.15.1/jquery.validate.min.js"></script>
     ===========================================================================================================
 
      public function destroy($id)
